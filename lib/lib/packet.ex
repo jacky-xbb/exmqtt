@@ -25,13 +25,13 @@ defmodule Exmqtt.Packet do
               will_qos: Const.qos_0(),
               will_retain: false,
               keepalive: 0,
-              properties: :undefined,
+              properties: nil,
               clientid: <<>>,
-              will_props: :undefined,
-              will_topic: :undefined,
-              will_payload: :undefined,
-              username: :undefined,
-              password: :undefined
+              will_props: nil,
+              will_topic: nil,
+              will_payload: nil,
+              username: nil,
+              password: nil
   end
 
   defmodule Connack do

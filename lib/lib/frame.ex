@@ -1,4 +1,4 @@
-defmodule Frame do
+defmodule Exmqtt.Frame do
   require ExmqttConstants
   alias ExmqttConstants, as: Const
   alias Exmqtt.Packet
@@ -174,10 +174,10 @@ defmodule Frame do
   def parse_packet(%Packet.Header{type: Const.publish, qos: qos}, bin, %{version: ver}) do
     {topic_name, rest} = parse_utf8_string(bin)
     {packet_id, rest1} = case qos do
-                            Const.qos_0 -> {:undefined, rest}
+                            Const.qos_0 -> {nil, rest}
                             _ -> parse_packet_id(rest)
                         end
-    (packet_id !== :undefined) and validate_packet_id(packet_id)
+    (packet_id !== nil) and validate_packet_id(packet_id)
     {properties, payload} = parse_properties(rest1, ver)
     {%Packet.Publish{
       topic_name: topic_name,
@@ -295,7 +295,7 @@ defmodule Frame do
   def validate_packet_id(_), do: :ok
 
   def parse_properties(bin, ver) when ver !== Const.mqtt_proto_v5 do
-    {:undefined, bin}
+    {nil, bin}
   end
   # TODO: version mess?
   def parse_properties(<<>>, Const.mqtt_proto_v5) do
@@ -440,7 +440,7 @@ defmodule Frame do
     {{key, val}, rest}
   end
 
-  def parse_utf8_string(bin, false), do: {:undefined, bin}
+  def parse_utf8_string(bin, false), do: {nil, bin}
   def parse_utf8_string(bin, true), do: parse_utf8_string(bin)
   def parse_utf8_string(<<len::16, str::binary-size(len), rest::binary>>), do: {str, rest}
 
@@ -478,7 +478,7 @@ defmodule Frame do
           retain: retain
         },
         variable,
-        payload) when Const.connect() <= type or type <= Const.auth() do
+        payload) when Const.connect() <= type and type <= Const.auth() do
     len = :erlang.iolist_size(variable) + :erlang.iolist_size(payload)
     len <= Const.max_packet_size() or raise "mqtt frame too large"
     [
@@ -561,7 +561,7 @@ defmodule Frame do
         ver) do
     [
       serialize_utf8_string(topic_name),
-      if packet_id === :undefined do
+      if packet_id === nil do
         <<>>
       else
         <<packet_id::unsigned-big-integer-size(16)>>
@@ -689,17 +689,18 @@ defmodule Frame do
     <<packet_id::unsigned-big-integer-size(16)>>
   end
 
-  def serialize_variable(:undefined, _ver) do
+  def serialize_variable(nil, _ver) do
     <<>>
   end
 
-  def serialize_payload(:undefined), do: <<>>
+  def serialize_payload(nil), do: <<>>
   def serialize_payload(bin), do: bin
 
   def serialize_binary_data(bin) do
     [<<byte_size(bin)::unsigned-big-integer-size(16)>>, bin]
   end
 
+  @spec serialize_properties(any, any) :: binary | [bitstring, ...]
   def serialize_properties(_props, ver) when ver !== Const.mqtt_proto_v5() do
     <<>>
   end
@@ -708,7 +709,7 @@ defmodule Frame do
     serialize_properties(props)
   end
 
-  def serialize_properties(:undefined) do
+  def serialize_properties(nil) do
     <<0>>
   end
 
@@ -725,7 +726,7 @@ defmodule Frame do
     [serialize_variable_byte_integer(byte_size(bin)), bin]
   end
 
-  def serialize_property(_, :undefined) do
+  def serialize_property(_, nil) do
     <<>>
   end
 
@@ -862,8 +863,8 @@ defmodule Frame do
     end
   end
 
-  def serialize_utf8_string(:undefined, false), do: raise("utf8 string undefined.")
-  def serialize_utf8_string(:undefined, true), do: <<>>
+  def serialize_utf8_string(nil, false), do: raise("utf8 string undefined.")
+  def serialize_utf8_string(nil, true), do: <<>>
   def serialize_utf8_string(string, _allow_null), do: serialize_utf8_string(string)
 
   def serialize_utf8_string(string) do
@@ -889,7 +890,7 @@ defmodule Frame do
     serialize_variable_byte_integer(i)
   end
 
-  def serialize_reason_codes(:undefined) do
+  def serialize_reason_codes(nil) do
     <<>>
   end
 
@@ -936,7 +937,7 @@ defmodule Frame do
   def mqtt_packet(header, variable), do: %Packet.Mqtt{header: header, variable: variable}
   def mqtt_packet(header, variable, payload), do: %Packet.Mqtt{header: header, variable: variable, payload: payload}
 
-  defp flag(:undefined), do: Const.reserved()
+  defp flag(nil), do: Const.reserved()
   defp flag(false), do: 0
   defp flag(true), do: 1
   defp flag(x) when is_integer(x), do: x
