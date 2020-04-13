@@ -84,7 +84,7 @@ defmodule Exmqtt.Packet do
   @spec connack_packet(any) :: Exmqtt.Package.Mqtt.t()
   def connack_packet(reason_code) do
     %Mqtt{
-      header: %Header{type: Const.connect()},
+      header: %Header{type: Const.connack()},
       variable: %Connack{
         ack_flags: 0,
         reason_code: reason_code
@@ -95,7 +95,7 @@ defmodule Exmqtt.Packet do
   @spec connack_packet(any, any) :: Exmqtt.Package.Mqtt.t()
   def connack_packet(reason_code, sess_present) do
     %Mqtt{
-      header: %Header{type: Const.connect()},
+      header: %Header{type: Const.connack()},
       variable: %Connack{
         ack_flags: sess_present,
         reason_code: reason_code
@@ -106,7 +106,7 @@ defmodule Exmqtt.Packet do
   @spec connack_packet(any, any, any) :: Exmqtt.Package.Mqtt.t()
   def connack_packet(reason_code, sess_present, properties) do
     %Mqtt{
-      header: %Header{type: Const.connect()},
+      header: %Header{type: Const.connack()},
       variable: %Connack{
         ack_flags: sess_present,
         reason_code: reason_code,

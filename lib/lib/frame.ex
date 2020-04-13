@@ -416,19 +416,19 @@ defmodule Exmqtt.Frame do
   end
 
   def parse_topic_filters(:subscribe, bin) do
-    for <<len::16, topic::binary-size(len), _::2, rh::2, rap::1, nl::1, qos::2>> <- bin do
+    for <<len::16, topic::binary-size(len), _::2, rh::2, rap::1, nl::1, qos::2 <- bin>>  do
       {topic, %{rh: rh, rap: rap, nl: nl, qos: validate_subqos(qos), rc: 0}}
     end
   end
 
   def parse_topic_filters(:unsubscribe, bin) do
-    for <<len::16, topic::binary-size(len)>> <- bin do
+    for <<len::16, topic::binary-size(len) <- bin>> do
       topic
     end
   end
 
   def parse_reason_codes(bin) do
-    for <<code>> <- bin, do: code
+    for <<code <- bin>>, do: code
   end
 
   def parse_utf8_pair(
