@@ -1,6 +1,7 @@
 defmodule Exmqtt do
-  # require ExmqttConstants
-  # alias ExmqttConstants, as: Const
+  require ExmqttConstants
+  alias ExmqttConstants, as: Const
+
   # API
 
   # def start_link(), do: start_link([])
