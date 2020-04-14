@@ -305,8 +305,113 @@ defmodule Exmatt.FrameTest do
       assert bin == serialize_to_binary(packet)
       assert {ok, ^packet, <<>>, _} = Frame.parse(bin)
     end
+
+    test "serialize and parse the subscribe packet of v5" do
+      topic_filters = [{<<"TopicQos0">>, %{rh: 1, qos: Const.qos_2, rap: 0, nl: 0, rc: 0}},
+                      {<<"TopicQos1">>, %{rh: 1, qos: Const.qos_2, rap: 0, nl: 0, rc: 0}}]
+      packet = Packet.subscribe_packet(3, %{"Subscription-Identifier" => 0xFFFFFFF}, topic_filters)
+      assert packet == parse_serialize(packet, %{version: Const.mqtt_proto_v5})
+    end
   end
 
+  describe "suback packet" do
+    test "serialize and parse the suback packet" do
+      packet = Packet.suback_packet(10, [Const.qos_0, Const.qos_1, 128])
+      assert packet == parse_serialize(packet)
+    end
+
+    test "serialize and parse the suback packet of v5" do
+      packet = Packet.suback_packet(
+        1,
+        %{
+          "Reason-String" => <<"success">>,
+          "User-Property" => [{<<"key">>, <<"value">>}]
+        },
+        [Const.qos_0, Const.qos_1, 128]
+      )
+      assert packet == parse_serialize(packet, %{version: Const.mqtt_proto_v5})
+    end
+  end
+
+  describe "unsubscribe packet" do
+    test "serialize and parse the unsubscribe packet" do
+      packet = Packet.unsubscribe_packet(2, [<<"TopicA">>])
+      bin = <<162,10,0,2,0,6,84,111,112,105,99,65>>
+      assert bin == serialize_to_binary(packet)
+      assert {ok, ^packet, <<>>, _} = Frame.parse(bin)
+    end
+
+    test "serialize and parse the unsubscribe packet of v5" do
+      props = %{"User-Property" => [{<<"key">>, <<"val">>}]}
+      packet = Packet.unsubscribe_packet(10, props, [<<"Topic1">>, <<"Topic2">>])
+      assert packet == parse_serialize(packet, %{version: Const.mqtt_proto_v5})
+    end
+  end
+
+  describe "unsuback packet" do
+    test "serialize and parse the unsuback packet" do
+      packet = Packet.unsuback_packet(10)
+      assert packet == parse_serialize(packet)
+    end
+
+    test "serialize and parse the unsuback packet of v5" do
+      packet = Packet.unsuback_packet(
+        10,
+        %{
+          "Reason-String" => <<"Not authorized">>,
+          "User-Property" => [{<<"key">>, <<"val">>}]
+        },
+        [0x87, 0x87, 0x87]
+      )
+      assert packet == parse_serialize(packet, %{version: Const.mqtt_proto_v5})
+    end
+  end
+
+  describe "ping packet" do
+    test "serialize and parse the pingreq packet" do
+      ping_req = Packet.packet(Const.pingreq)
+      assert ping_req == parse_serialize(ping_req)
+    end
+
+    test "serialize and parse the pingresp packet" do
+      ping_resp = Packet.packet(Const.pingresp)
+      assert ping_resp == parse_serialize(ping_resp)
+    end
+  end
+
+  describe "disconnect packet" do
+    test "serialize and parse the disconnect packet" do
+      packet = Packet.disconnect_packet(Const.rc_success)
+      assert packet == parse_serialize(packet)
+    end
+
+    test "serialize and parse the disconnect packet of v5" do
+      packet = Packet.disconnect_packet(
+        Const.rc_success,
+        %{
+          "Session-Expiry-Interval" => 60,
+          "Reason-String" => <<"server_moved">>,
+          "Server-Reference" => <<"192.168.1.10">>
+        }
+      )
+      assert packet == parse_serialize(packet, %{version: Const.mqtt_proto_v5})
+    end
+  end
+
+  describe "auth packet" do
+    test "serialize and parse the auth packet of v5" do
+      packet = Packet.auth_packet(
+        Const.rc_success,
+        %{
+          "Authentication-Method" => <<"oauth2">>,
+          "Authentication-Data" => <<"3zekkd">>,
+          "Reason-String" => <<"success">>,
+          "User-Property" => [{<<"key">>, <<"val">>}]
+        }
+      )
+      assert packet == parse_serialize(packet, %{version: Const.mqtt_proto_v5})
+    end
+  end
 
   # --------------------------
   # Helper

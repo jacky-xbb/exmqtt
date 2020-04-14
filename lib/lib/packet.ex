@@ -442,6 +442,18 @@ defmodule Exmqtt.Packet do
     }
   end
 
+  @spec unsuback_packet(any, any, any) :: Exmqtt.Packet.Mqtt.t()
+  def unsuback_packet(packet_id, properties, reason_code) do
+    %Mqtt{
+      header: %Header{type: Const.unsuback()},
+      variable: %Unsuback{
+        packet_id: packet_id,
+        properties: properties,
+        reason_code: reason_code
+      }
+    }
+  end
+
   @spec disconnect_packet :: Exmqtt.Packet.Mqtt.t()
   def disconnect_packet() do
     %Mqtt{
