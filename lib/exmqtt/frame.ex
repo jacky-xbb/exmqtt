@@ -3,6 +3,16 @@ defmodule Exmqtt.Frame do
   alias ExmqttConstants, as: Const
   alias Exmqtt.Packet
 
+
+  @type options() :: %{
+    strict_mode: boolean(),
+    max_size: 1..Const.max_packet_size,
+    version: version()
+  }
+  @type cont_fun() :: function((binary()) :: parse_result()
+  @opaque parse_state() :: {:none, options()} | cont_fun()
+  @opaque parse_result() :: {:more, cont_fun()} | {ok, %Packet.Mqtt{}, binary(), parse_state()}
+
   @type version() :: Const.mqtt_proto_v3() | Const.mqtt_proto_v4() | Const.mqtt_proto_v5()
 
   @default_options %{

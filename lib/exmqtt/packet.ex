@@ -14,6 +14,19 @@ defmodule Exmqtt.Packet do
   end
 
   # ----------------------------
+  # MQTT Message
+  # ----------------------------
+  defmodule Msg do
+    defstruct :packet_id,
+              :topic,
+              :props,
+              :payload,
+              qos: Const.qos_0,
+              retain: false,
+              dup: false
+  end
+
+  # ----------------------------
   # MQTT Packet
   # ----------------------------
   defmodule Connect do

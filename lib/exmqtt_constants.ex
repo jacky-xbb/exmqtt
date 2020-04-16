@@ -1,9 +1,9 @@
 defmodule ExmqttConstants do
   use Constants
 
-  # ------------------------------------
+  # ------------------------------------------------------
   # MQTT QoS Levels
-  # ------------------------------------
+  # ------------------------------------------------------
 
   # At most once
   define(qos_0, 0)
@@ -12,9 +12,9 @@ defmodule ExmqttConstants do
   # Exactly once
   define(qos_2, 2)
 
-  # ------------------------------------
+  # ------------------------------------------------------
   # MQTT Control Packet Types
-  # ------------------------------------
+  # ------------------------------------------------------
 
   # Reserved
   define(reserved, 0)
@@ -49,9 +49,9 @@ defmodule ExmqttConstants do
   # Authentication exchange
   define(auth, 15)
 
-  # ------------------------------------
+  # ------------------------------------------------------
   # MQTT V5.0 Reason Codes
-  # ------------------------------------
+  # ------------------------------------------------------
   define(rc_success,                                0x00)
   define(rc_normal_disconnection,                   0x00)
   define(rc_granted_qos_0,                          0x00)
@@ -98,22 +98,33 @@ defmodule ExmqttConstants do
   define(rc_subscription_identifiers_not_supported, 0xA1)
   define(rc_wildcard_subscriptions_not_supported,   0xA2)
 
-  # ------------------------------------
+  # ------------------------------------------------------
   # MQTT Protocol Version and Names
-  # ------------------------------------
+  # ------------------------------------------------------
   define(mqtt_proto_v3, 3)
   define(mqtt_proto_v4, 4)
   define(mqtt_proto_v5, 6)
 
-  # ------------------------------------
+  # ------------------------------------------------------
   # MQTT Frame Mask
-  # ------------------------------------
+  # ------------------------------------------------------
   define(highbit, 0b10000000)
   define(lowbits, 0b01111111)
 
-  # ------------------------------------
+  # ------------------------------------------------------
   # Maximum MQTT Packet ID and Length
-  # ------------------------------------
+  # ------------------------------------------------------
   define(max_packet_id, 0xffff)
   define(max_packet_size, 0xfffffff)
+
+  # ------------------------------------------------------
+  # Default timeout
+  # ------------------------------------------------------
+  define(default_keepalive, 60)
+  define(default_ack_timeout, 30000)
+  define(default_connect_timeout, 60000)
+
+  define(no_client_id, <<>>)
+
+  define(no_msg_hdlr, nil)
 end

@@ -1,4 +1,4 @@
-defmodule Props do
+defmodule Exmqtt.Props do
   require ExmqttConstants
   alias ExmqttConstants, as: Const
   alias Exmqtt.Errors.BadProperty
