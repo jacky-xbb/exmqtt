@@ -8,4 +8,14 @@ defmodule Exmqtt.Errors do
       %BadProperty{message: msg}
     end
   end
+
+  defmodule BadClientID do
+    defexception [:message]
+
+    @impl ture
+    def exception() do
+      msg = "bad client id"
+      %BadClientID{message: msg}
+    end
+  end
 end

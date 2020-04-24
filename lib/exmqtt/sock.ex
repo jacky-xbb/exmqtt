@@ -29,8 +29,8 @@ defmodule Exmqtt.Sock do
     end
   end
 
-  @spec send(:erlang.socket(), iodata()) :: :ok | {:error, :einval | :closed}
-  def send(sock, data) when is_port(sock) do
+  @spec send_data(:erlang.socket(), iodata()) :: :ok | {:error, :einval | :closed}
+  def send_data(sock, data) when is_port(sock) do
     try do
       :erlang.port_command(sock, data)
       :ok
@@ -38,8 +38,8 @@ defmodule Exmqtt.Sock do
       ArgumentError -> {:error, :einval}
     end
   end
-  def send(ssl_socket(ssl: ssl_sock), data) do
-    :ssl.send(ssl_sock, data)
+  def send_data(ssl_socket(ssl: ssl_sock), data) do
+    :ssl.send_data(ssl_sock, data)
   end
 
   @spec close(socket()) :: :ok | {:error, any}

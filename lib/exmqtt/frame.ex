@@ -72,7 +72,7 @@ defmodule Exmqtt.Frame do
     parse_remaining_len(rest, header, 1, 0, options)
   end
 
-  def arse_remaining_len(
+  def parse_remaining_len(
     _bin,
     _header,
     _multiplier,
