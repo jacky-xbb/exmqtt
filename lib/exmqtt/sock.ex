@@ -39,7 +39,7 @@ defmodule Exmqtt.Sock do
     end
   end
   def send_data(ssl_socket(ssl: ssl_sock), data) do
-    :ssl.send_data(ssl_sock, data)
+    :ssl.send(ssl_sock, data)
   end
 
   @spec close(socket()) :: :ok | {:error, any}

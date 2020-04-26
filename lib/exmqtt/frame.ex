@@ -6,12 +6,13 @@ defmodule Exmqtt.Frame do
 
   @type options() :: %{
     strict_mode: boolean(),
-    max_size: 1..Const.max_packet_size,
+    # max_size: 1..Const.max_packet_size(),
+    max_size: 1..0xfffffff,
     version: version()
   }
-  @type cont_fun() :: function((binary()) :: parse_result()
+  @type cont_fun() :: ((binary()) -> parse_result())
   @opaque parse_state() :: {:none, options()} | cont_fun()
-  @opaque parse_result() :: {:more, cont_fun()} | {ok, %Packet.Mqtt{}, binary(), parse_state()}
+  @opaque parse_result() :: {:more, cont_fun()} | {:ok, %Packet.Mqtt{}, binary(), parse_state()}
 
   @type version() :: Const.mqtt_proto_v3() | Const.mqtt_proto_v4() | Const.mqtt_proto_v5()
 

@@ -80,7 +80,7 @@ defmodule Exmqtt.Props do
       end)
   end
 
-  def vilidate(props) when is_map(props) do
+  def validate(props) when is_map(props) do
     props |> Enum.each(&validate_prop/1)
   end
 

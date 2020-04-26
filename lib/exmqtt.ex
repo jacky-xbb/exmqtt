@@ -1,8 +1,21 @@
-defmodule Exmqtt do
-  use GenStateMachine
-
-  require Record, Logger
+defmodule QoS do
   require ExmqttConstants
+  alias ExmqttConstants, as: Const
+  @spec is_qos(any) :: boolean
+  defmacro is_qos(i) do
+    quote do
+      unquote(i >= Const.qos_0 and i <= Const.qos_2)
+    end
+  end
+end
+
+defmodule Exmqtt do
+  use GenStateMachine, callback_mode: :state_functions
+
+  require Record
+  require Logger
+  require ExmqttConstants
+  require QoS
 
   alias ExmqttConstants, as: Const
   alias Exmqtt.Packet
@@ -20,7 +33,7 @@ defmodule Exmqtt do
   @type reason_code() :: 0..0xFF
   @type properties() :: %{String.t() => term()}
   @type version() :: Const.mqtt_proto_v3 | Const.mqtt_proto_v4 | Const.mqtt_proto_v5
-  @type qos() :: Const.qos_0 | const.qos_1 | Const.qos_2
+  @type qos() :: Const.qos_0 | Const.qos_1 | Const.qos_2
   @type qos_name() :: :qos0 | :at_most_once
                       |:qos1 | :at_least_once
                       |:qos2 | :exactly_once
@@ -40,9 +53,9 @@ defmodule Exmqtt do
   # Message handler is a set of callbacks defined to handle MQTT messages
   # as well as the disconnect event.
   @type msg_handler() :: %{
-    puback: function() :: any(),
-    publish: function(:emqx_types.message()) :: any(),
-    disconnected: function({reason_code(), _properties :: term()}) :: any()
+    puback: (() -> any()),
+    publish: ((:emqx_types.message()) -> any()),
+    disconnected: (({reason_code(), _properties :: term()}) -> any())
   }
 
   @type option() :: {:name, atom()}
@@ -54,7 +67,7 @@ defmodule Exmqtt do
                   | {:tcp_opts, [:gen_tcp.option()]}
                   | {:ssl, boolean()}
                   | {:ssl_opts, [:ssl.ssl_option()]}
-                  | {:ws_path, string()}
+                  | {:ws_path, charlist()}
                   | {:connect_timeout, pos_integer()}
                   | {:bridge_mode, boolean()}
                   | {:clientid, iodata()}
@@ -111,7 +124,7 @@ defmodule Exmqtt do
     properties:      properties(),
     pending_calls:   list(),
     subscriptions:   map(),
-    max_inflight:    infinity | pos_integer(),
+    max_inflight:    :infinity | pos_integer(),
     inflight:        %{packet_id() => term()},
     awaiting_rel:    map(),
     auto_ack:        boolean(),
@@ -143,25 +156,21 @@ defmodule Exmqtt do
       nil ->
         GenStateMachine.start_link(__MODULE__, [with_owner(options)], [])
       reg_name when is_atom(reg_name) ->
-        GenStateMachine.start_link(__MUDULE__, [with_owner(options)], name: reg_name)
+        GenStateMachine.start_link(__MODULE__, [with_owner(options)], name: reg_name)
     end
   end
 
   @spec connect(client()) :: {:ok, properties()} | {:error, term()}
   def connect(client) do
-    call(client, {:connect, :emqtt_sock})
+    do_call(client, {:connect, :emqtt_sock})
   end
 
   def ws_connect(client) do
-    call(client, {:connect, :emqtt_ws})
-  end
-
-  def call(client, req) do
-    GenStateMachine.call(client, req, :infinity)
+    do_call(client, {:connect, :emqtt_ws})
   end
 
   # @private
-  def call(client, req) do
+  def do_call(client, req) do
     GenStateMachine.call(client, req, :infinity)
   end
 
@@ -170,10 +179,12 @@ defmodule Exmqtt do
   def subscribe(client, topic) when is_binary(topic) do
     subscribe(client, {topic, Const.qos_0})
   end
-  def subscribe(client, {topic, qos}) when is_binary(topic), is_atom(qos) do
-    subscribe(client, {topic, qos_i(qos)})
+  def subscribe(client, {topic, qos}) when is_binary(topic) and is_atom(qos) do
+    subscribe(client, [{topic, qos_i(qos)}])
   end
-  def subscribe(client, {topic, qos}) when is_binary(topic) and is_qos(qos) do
+
+  def subscribe(client, {topic, qos})
+    when is_binary(topic) and qos >= Const.qos_0 and qos <= Const.qos_2 do
     subscribe(client, [{topic, qos_i(qos)}])
   end
   def subscribe(client, topics) when is_list(topics) do
@@ -183,7 +194,7 @@ defmodule Exmqtt do
               topics,
               fn
                 {topic, qos} when is_binary(topic) and is_atom(qos) -> {topic, [{:qos, qos_i(qos)}]}
-                {topic, qos} when is_binary(topic) and is_qos(qos) -> {topic, [{:qos, qos_i(qos)}]}
+                {topic, qos} when is_binary(topic) and qos >= Const.qos_0 and qos <= Const.qos_2 -> {topic, [{:qos, qos_i(qos)}]}
                 {topic, opts} when is_binary(topic) and is_list(opts) -> {topic, opts}
               end))
   end
@@ -192,7 +203,8 @@ defmodule Exmqtt do
   def subscribe(client, topic, qos) when is_binary(topic) and is_atom(qos) do
     subscribe(client, topic, qos_i(qos))
   end
-  def subscribe(client, topic, qos) when is_binary(topic) and is_qos(qos) do
+  def subscribe(client, topic, qos)
+    when is_binary(topic) and qos >= Const.qos_0 and qos <= Const.qos_2 do
     subscribe(client, topic, [{:qos, qos}])
   end
   def subscribe(client, topic, opts) when is_binary(topic) and is_list(opts) do
@@ -212,7 +224,7 @@ defmodule Exmqtt do
     subscribe(client, properties, topic, qos_i(qos))
   end
   def subscribe(client, properties, topic, qos)
-      when is_map(properties) and is_binary(topic) and is_qos(qos) do
+      when is_map(properties) and is_binary(topic) and qos >= Const.qos_0 and qos <= Const.qos_2 do
     subscribe(client, properties, topic, [{:qos, qos}])
   end
   def subscribe(client, properties, topic, opts)
@@ -256,7 +268,8 @@ defmodule Exmqtt do
   def publish(client, topic, payload, qos) when is_binary(topic) and is_atom(qos) do
     publish(client, topic, payload, [{:qos, qos_i(qos)}])
   end
-  def publish(client, topic, payload, qos) when is_binary(topic) and is_qos(qos) do
+  def publish(client, topic, payload, qos)
+    when is_binary(topic) and qos >= Const.qos_0 and qos <= Const.qos_2 do
     publish(client, topic, payload, [{:qos, qos}])
   end
   def publish(client, topic, payload, opts) when is_binary(topic) and is_list(opts) do
@@ -269,7 +282,7 @@ defmodule Exmqtt do
       when is_binary(topic) and is_map(properties) and is_list(opts) do
     :ok = Props.validate(properties)
     retain = Keyword.get(opts, :retain)
-    qos = qos_i(Keyword.get_value(opts, :qos, Const.qos_0))
+    qos = qos_i(Keyword.get(opts, :qos, Const.qos_0))
     publish(client, %Packet.Msg{qos: qos,
                                 retain: retain,
                                 topic: topic,
@@ -292,10 +305,10 @@ defmodule Exmqtt do
   end
 
   @spec unsubscribe(client(), properties(), topic() | [topic()]) :: subscribe_ret()
-  def unsubscribe(client, properties, topic) when is_map(properties), is_binary(topic) do
+  def unsubscribe(client, properties, topic) when is_map(properties) and is_binary(topic) do
     unsubscribe(client, properties, [topic])
   end
-  def unsubscribe(client, properties, topics) when is_map(properties), is_list(topics) do
+  def unsubscribe(client, properties, topics) when is_map(properties) and is_list(topics) do
     GenStateMachine.call(client, {:unsubscribe, properties, topics})
   end
 
@@ -388,12 +401,13 @@ defmodule Exmqtt do
 
   def resume(client) do
     GenStateMachine.call(client, :resume)
+  end
 
   # --------------------------------------------------------------------
   # gen_statem callbacks
   # --------------------------------------------------------------------
   def init([options]) do
-    Process.process_flag(:trap_exit, true)
+    Process.flag(:trap_exit, true)
     client_id = case {Keyword.get(options, :proto_ver, :v4),
                       Keyword.get(options, :clientid)} do
       {:v5, nil} -> Const.no_client_id
@@ -587,7 +601,9 @@ defmodule Exmqtt do
     state(state, parse_state: parse_state)
   end
 
-  def callback_mode(), do: :state_functions
+  # def callback_mode() do
+  #   :state_functions
+  # end
 
   def initialized({:call, from}, {:connect, conn_mod}, state(sock_opts: sock_opts,
     connect_timeout: timeout) = state) do
@@ -619,7 +635,12 @@ defmodule Exmqtt do
                          will_flag: will_flag,
                          will_msg: will_msg,
                          properties: properties) = state) do
-  will_msg(will_qos, will_retain, will_topic, will_props, will_payload) = will_msg
+  %Packet.Msg{
+    qos: will_qos,
+    retain: will_retain,
+    topic: will_topic,
+    props: will_props,
+    payload: will_payload} = will_msg
   conn_props = Props.filter(Const.connect, properties)
   send_data(Packet.connect_packet(%Packet.Connect{
                                   proto_ver: proto_ver,
@@ -639,9 +660,18 @@ defmodule Exmqtt do
                                   password: password}), state)
   end
 
-  def waiting_for_connack(:cast, Packet.connack_packet(Const.rc_success, sess_present, properties),
-                          state(properties: all_props, clientid: client_id) = state) do
-    case take_call(connect, state) do
+  def waiting_for_connack(
+    :cast,
+    %Packet.Mqtt{
+      header: %Packet.Header{type: Const.connack()},
+      variable: %Packet.Connack{
+        ack_flags: sess_present,
+        reason_code: Const.rc_success,
+        properties: properties
+      }
+    },
+    state(properties: all_props, clientid: client_id) = state) do
+    case take_call(:connect, state) do
       {:value, call(from: from), state1} ->
         all_props1 = case properties do
                       nil -> all_props
@@ -658,10 +688,19 @@ defmodule Exmqtt do
     end
   end
 
-  def waiting_for_connack(:cast, Packet.connack_packet(reason_code, _sess_present, properties),
-                          state(proto_ver: proto_ver) = state) do
+  def waiting_for_connack(
+    :cast,
+    %Packet.Mqtt{
+      header: %Packet.Header{type: Const.connack()},
+      variable: %Packet.Connack{
+        ack_flags: _sess_present,
+        reason_code: reason_code,
+        properties: properties
+      }
+    },
+    state(proto_ver: proto_ver) = state) do
     reason = reason_code_name(reason_code, proto_ver)
-    case take_call(connect, state) do
+    case take_call(:connect, state) do
       {:value, call(from: from), _state} ->
         reply = {:error, {reason, properties}}
         {:stop_and_reply, {:shutdown, Reason}, [{:reply, from, reply}]}
@@ -669,11 +708,11 @@ defmodule Exmqtt do
     end
   end
 
-  def waiting_for_connack(timeout, _timeout, state) do
-    case take_call(connect, state) do
+  def waiting_for_connack(:timeout, _timeout, state) do
+    case take_call(:connect, state) do
       {:value, call(from: from), _state} ->
           reply = {:error, :connack_timeout}
-          {:stop_and_reply, :connack_timeout, [{rreply, from, reply}]}
+          {:stop_and_reply, :connack_timeout, [{:reply, from, reply}]}
       false -> {:stop, :connack_timeout}
     end
   end
@@ -682,8 +721,8 @@ defmodule Exmqtt do
     case take_call(:connect, state) do
       {:value, call(from: from), _state} ->
         case handle_event(event_type, event_content, :waiting_for_connack, state) do
-            {:stop, reason, state} ->
-                reply = {:error, {reason, event_content}},
+            {:stop, reason, _state} ->
+                reply = {:error, {reason, event_content}}
                 {:stop_and_reply, reason, [{:reply, from, reply}]}
             state_callback_result ->
               state_callback_result
@@ -709,7 +748,7 @@ defmodule Exmqtt do
     {:keep_state, state(state, paused: false), [{:reply, from, :ok}]}
   end
 
-  def connected({:call, from}, clientid, state(clientid: client_id)) do
+  def connected({:call, from}, :clientid, state(clientid: client_id)) do
     {:keep_state_and_data, [{:reply, from, client_id}]}
   end
 
@@ -739,7 +778,7 @@ defmodule Exmqtt do
   def connected({:call, from}, {:publish, %Packet.Msg{qos: qos} = msg},
                 state(inflight: inflight, last_packet_id: packet_id) = state)
                 when qos === Const.qos_1 or qos === Const.qos_2 do
-    msg1 = %Packet.Msg{packet_id: packet_id}
+    msg1 = %Packet.Msg{msg | packet_id: packet_id}
     case send_data(msg1, state) do
       {:ok, new_state} ->
         inflight1 = Map.put(inflight, packet_id, {:publish, msg1, :os.timestamp()})
@@ -800,27 +839,78 @@ defmodule Exmqtt do
     send_puback(Packet.pubcomp_packet(packet_id, reason_code, properties), state)
   end
 
-  def connected(:cast, Packet.publish_packet(_qos, _packet_id), state{paused: true}) do
+  def connected(
+    :cast,
+    %Packet.Mqtt{
+      header: %Packet.Header{
+        type: Const.publish(),
+        qos: _qos
+      },
+      variable: %Packet.Publish{}
+    },
+    state(paused: true)) do
     :keep_state_and_data
   end
 
-  def connected(:cast, Packet.publish_packet(Const.qos_0, _packet_id) = packet, state) do
+  def connected(
+    :cast,
+    %Packet.Mqtt{
+      header: %Packet.Header{
+        type: Const.publish(),
+        qos: Const.qos_0
+      },
+      variable: %Packet.Publish{}
+    } = packet,
+    state) do
     {:keep_state, deliver(packet_to_msg(packet), state)}
   end
 
-  def connected(:cast, Packet.publish_packet(Const.qos_1, _packet_id) = packet, state) do
+  def connected(
+    :cast,
+    %Packet.Mqtt{
+      header: %Packet.Header{
+        type: Const.publish(),
+        qos: Const.qos_1
+      },
+      variable: %Packet.Publish{}
+    } = packet,
+    state) do
     publish_process(Const.qos_1, packet, state)
   end
 
-  def connected(:cast, Packet.publish_packet(Const.qos_2, _packet_id) = packet, state) do
+  def connected(
+    :cast,
+    %Packet.Mqtt{
+      header: %Packet.Header{
+        type: Const.publish(),
+        qos: Const.qos_2
+      },
+      variable: %Packet.Publish{}
+    } = packet,
+    state) do
     publish_process(Const.qos_2, packet, state)
   end
 
-  def connected(:cast, Packet.puback_packet(_packet_id, _reason_code, _properties) = puback, state) do
+  def connected(
+    :cast,
+    %Packet.Mqtt{
+      header: %Packet.Header{type: Const.puback()},
+      variable: _
+    } = puback,
+    state) do
     {:keep_state, delete_inflight(puback, state)}
   end
 
-  def connected(:cast, Packet.pubrec_packet(packet_id), state(inflight: inflight) = state) do
+  def connected(
+    :cast,
+    %Packet.Mqtt{
+      header: %Packet.Header{type: Const.pubrec()},
+      variable: %Packet.Puback{
+        packet_id: packet_id,
+        reason_code: 0
+      }
+    },
+    state(inflight: inflight) = state) do
     n_state = case Map.fetch(inflight, packet_id) do
           {:ok, {:publish, _msg, _ts}} ->
             inflight1 = Map.put(inflight, packet_id, {:pubrel, packet_id, :os.timestamp()})
@@ -836,8 +926,19 @@ defmodule Exmqtt do
   end
 
   # TODO::... if auto_ack is false, should we take packet_id from the map?
-  def connected(:cast, Packet.pubrel_packet(packet_id),
-                state(awaiting_rel: awaiting_rel, auto_ack: auto_ack) = state) do
+  def connected(
+    :cast,
+    %Packet.Mqtt{
+      header: %Packet.Header{
+        type: Const.pubrel(),
+        qos: Const.qos_1()
+      },
+      variable: %Packet.Puback{
+        packet_id: packet_id,
+        reason_code: 0
+      }
+    },
+    state(awaiting_rel: awaiting_rel, auto_ack: auto_ack) = state) do
     case map_take(awaiting_rel, packet_id) do
       {packet, awaiting_rel1} ->
         new_state = deliver(packet_to_msg(packet), state(state, awaiting_rel: awaiting_rel1))
@@ -851,12 +952,27 @@ defmodule Exmqtt do
     end
   end
 
-  def connected(:cast, Packet.pubcomp_packet(_packet_id, _reason_code, _properties) = pubcomp, state) do
+  def connected(
+    :cast,
+    %Packet.Mqtt{
+      header: %Packet.Header{type: Const.pubcomp()},
+      variable: %Packet.Puback{}
+    } = pubcomp,
+    state) do
     {:keep_state, delete_inflight(pubcomp, state)}
   end
 
-  def connected(:cast, Packet.suback_packet(packet_id, properties, reason_code),
-                state(subscriptions: _subscriptions) = state) do
+  def connected(
+    :cast,
+    %Packet.Mqtt{
+      header: %Packet.Header{type: Const.suback()},
+      variable: %Packet.Suback{
+        packet_id: packet_id,
+        properties: properties,
+        reason_code: reason_code
+      }
+    },
+    state(subscriptions: _subscriptions) = state) do
     case take_call({:subscribe, packet_id}, state) do
       {:value, call(from: from), new_state} ->
         # TODO: Merge reason codes to subscriptions?
@@ -867,8 +983,17 @@ defmodule Exmqtt do
     end
   end
 
-  def connected(:cast, Packet.unsuback_packet(packet_id, properties, reason_code),
-                state(subscriptions: subscriptions) = state) do
+  def connected(
+    :cast,
+    %Packet.Mqtt{
+      header: %Packet.Header{type: Const.unsuback()},
+      variable: %Packet.Unsuback{
+        packet_id: packet_id,
+        properties: properties,
+        reason_code: reason_code
+      }
+    },
+    state(subscriptions: subscriptions) = state) do
     case take_call({:unsubscribe, packet_id}, state) do
       {:value, call(from: from, req: {_, _, topics}), new_state} ->
         subscriptions1 = List.foldl(topics, subscriptions, fn (topic, acc) ->
@@ -881,10 +1006,20 @@ defmodule Exmqtt do
     end
   end
 
-  def connected(:cast, Packet.packet(Const.pingresp), state(pending_calls: [])) do
+  def connected(
+    :cast,
+    %Packet.Mqtt{
+      header: %Packet.Header{type: Const.pingresp}
+    },
+    state(pending_calls: [])) do
     :keep_state_and_data
   end
-  def connected(:cast, Packet.packet(Const.pingresp), state) do
+  def connected(
+    :cast,
+    %Packet.Mqtt{
+      header: %Packet.Header{type: Const.pingresp}
+    },
+    state) do
     case take_call(:ping, state) do
       {:value, call(from: from), new_state} ->
         {:keep_state, new_state, [{:reply, from, :pong}]}
@@ -893,11 +1028,20 @@ defmodule Exmqtt do
     end
   end
 
-  def connected(:cast, Packet.disconnect_packet(reason_code, properties), state) do
+  def connected(
+    :cast,
+    %Packet.Mqtt{
+      header: %Packet.Header{type: Const.disconnect()},
+      variable: %Packet.Disconnect{
+        reason_code: reason_code,
+        properties: properties
+      }
+    },
+    state) do
     {:stop, {:disconnected, reason_code, properties}, state}
   end
 
-  def connected(:info, {:timeout, _tref, keepalive}, state(force_ping: true) = state) do
+  def connected(:info, {:timeout, _tref, :keepalive}, state(force_ping: true) = state) do
     case send_data(Packet.packet(Const.pingreq), state) do
       {:ok, new_state} ->
           {:keep_state, ensure_keepalive_timer(new_state)}
@@ -905,9 +1049,9 @@ defmodule Exmqtt do
     end
   end
 
-  def connected(:info, {:timeout, _tref, keepalive},
+  def connected(:info, {:timeout, tref, :keepalive},
                 state(conn_mod: conn_mod, socket: sock,
-                paused: paused, keepalive_timer: _tref) = state) do
+                paused: paused, keepalive_timer: tref) = state) do
     case (not paused) and should_ping(conn_mod, sock) do
       true ->
         case send_data(Packet.packet(Const.pingreq), state) do
@@ -922,7 +1066,7 @@ defmodule Exmqtt do
     end
   end
 
-  def connected(:info, {:timeout, tref, :ack}, state(ack_timer: tfef,
+  def connected(:info, {:timeout, tref, :ack}, state(ack_timer: tref,
                                                      ack_timeout: timeout,
                                                      pending_calls: calls) = state) do
     new_state = state(state, ack_timer: nil, pending_calls: timeout_calls(timeout, calls))
@@ -944,11 +1088,24 @@ defmodule Exmqtt do
     when (qos === Const.qos_1) or (qos === Const.qos_2) do
     {:keep_state_and_data, [:postpone]}
   end
-  def inflight_full(:cast, Packet.puback_packet(_packet_id, _reason_code, _properties) = puback, state) do
+  def inflight_full(
+    :cast,
+    %Packet.Mqtt{
+      header: %Packet.Header{type: Const.puback()},
+      variable: %Packet.Puback{}
+    } = puback,
+    state) do
     delete_inflight_when_full(puback, state)
   end
-  def inflight_full(:cast, Packet.pubcomp_packet(_packet_id, _reason_code, _properties) = pubcomp, state) do
+  def inflight_full(
+    :cast,
+    %Packet.Mqtt{
+      header: %Packet.Header{type: Const.pubcomp()},
+      variable: %Packet.Puback{}
+    } = pubcomp,
+    state) do
       delete_inflight_when_full(pubcomp, state)
+  end
   def inflight_full(event_type, event_content, data) do
     # inflight_full is a sub-state of connected state,
     # delegate all other events to connected state.
@@ -985,7 +1142,7 @@ defmodule Exmqtt do
   end
 
   def handle_event(:info, {closed, _sock}, _state_name, state)
-    when closed === :tcp_closed closed === :ssl_closed do
+    when closed === :tcp_closed or closed === :ssl_closed do
     Logger.debug("Close #{inspect(closed)}")
     {:stop, {:shutdown, closed}, state}
   end
@@ -1004,14 +1161,14 @@ defmodule Exmqtt do
     {:stop, {:shutdown, reason}, state}
   end
 
-  def handle_event(:info, {"EXIT", _pid, :normal} = event_content, state_name, state) do
-    Logger.info("state: #{insepct(state_name)}, Unexpected Event: #{inspect(event_content)}")
+  def handle_event(:info, {"EXIT", _pid, :normal} = event_content, state_name, _state) do
+    Logger.info("state: #{inspect(state_name)}, Unexpected Event: #{inspect(event_content)}")
     :keep_state_and_data
   end
 
-  def handle_event(event_type, event_content, state_name, state) do
-    Logger.info("state: #{insepct(state_name)},
-      Unexpected Event: (#{insepct(event_type)}, #{inspect(event_content)})")
+  def handle_event(event_type, event_content, state_name, _state) do
+    Logger.info("state: #{inspect(state_name)},
+      Unexpected Event: (#{inspect(event_type)}, #{inspect(event_content)})")
     :keep_state_and_data
   end
 
@@ -1052,34 +1209,50 @@ defmodule Exmqtt do
   defp is_inflight_full(state(max_inflight: :infinity)) do
     false
   end
-  defp is_inflight_full(state(max_inflight: max_limit, inflight: inflight}) do
+  defp is_inflight_full(state(max_inflight: max_limit, inflight: inflight)) do
     map_size(inflight) >= max_limit
   end
 
-  defp delete_inflight(Packet.puback_packet(packet_id, reason_code, properties),
+  defp delete_inflight(
+    %Packet.Mqtt{
+      header: %Packet.Header{type: Const.puback()},
+      variable: %Packet.Puback{
+        packet_id: packet_id,
+        reason_code: reason_code,
+        properties: properties
+      }
+    },
     state(inflight: inflight) = state) do
     case Map.fetch(inflight, packet_id) do
       {:ok, {:publish, %Packet.Msg{packet_id: packet_id}, _ts}} ->
-        :ok = eval_msg_handler(state, puback, %{packet_id: packet_id,
+        :ok = eval_msg_handler(state, :puback, %{packet_id: packet_id,
                                                 reason_code: reason_code,
                                                 properties: properties})
         state(state, inflight: Map.delete(inflight, packet_id))
       :error ->
-        log(:warn, "Unexpected PUBACK Packet", [packet_id], state),
+        Logger.warn("Unexpected PUBACK Packet #{inspect(packet_id)}")
         state
       end
   end
-  defp delete_inflight(Packet.pubcomp_packet(packet_id, reason_code, properties),
+  defp delete_inflight(
+    %Packet.Mqtt{
+      header: %Packet.Header{type: Const.pubcomp()},
+      variable: %Packet.Puback{
+        packet_id: packet_id,
+        reason_code: reason_code,
+        properties: properties
+      }
+    },
     state(inflight: inflight) = state) do
       case Map.fetch(inflight, packet_id) do
         {:ok, {:pubrel, _packet_id, _ts}} ->
-          :ok = eval_msg_handler(state, :puback, %{packet_id   => packet_id,
-                                                  reason_code => reason_code,
-                                                  properties  => properties}),
+          :ok = eval_msg_handler(state, :puback, %{packet_id: packet_id,
+                                                  reason_code: reason_code,
+                                                  properties: properties})
           state(state, inflight: Map.delete(inflight, packet_id))
         :error ->
-          log(:warn, "Unexpected PUBCOMP Packet", [packet_id], state),
-          state
+        Logger.warn("Unexpected PUBCOMP Packet #{inspect(packet_id)}")
+        state
       end
   end
 
@@ -1103,16 +1276,32 @@ defmodule Exmqtt do
     id
   end
 
-  defp publish_process(Const.qos_1, Packet.publish_packet(Const.qos_1, packet_id) = packet,
-                      state(auto_ack: auto_ack) = state) do
+  defp publish_process(
+    Const.qos_1,
+    %Packet.Mqtt{
+      header: %Packet.Header{
+        type: Const.publish(),
+        qos: Const.qos_1
+      },
+      variable: %Packet.Publish{packet_id: packet_id}
+    } = packet,
+    state(auto_ack: auto_ack) = state0) do
     state = deliver(packet_to_msg(packet), state0)
     case auto_ack do
       true  -> send_puback(Packet.puback_packet(packet_id), state)
       false -> {:keep_state, state}
     end
   end
-  defp publish_process(Const.qos_2, Packet.publish_packet(Const.qos_2, packet_id) = packet,
-                      state(awaiting_rel: awaiting_rel) = state) do
+  defp publish_process(
+    Const.qos_2,
+    %Packet.Mqtt{
+      header: %Packet.Header{
+        type: Const.publish(),
+        qos: Const.qos_2
+      },
+      variable: %Packet.Publish{packet_id: packet_id}
+    } = packet,
+    state(awaiting_rel: awaiting_rel) = state) do
     case send_puback(Packet.pubrec_packet(packet_id), state) do
         {:keep_state, new_state} ->
             awaiting_rel1 = Map.put(awaiting_rel, packet_id, packet)
@@ -1121,16 +1310,18 @@ defmodule Exmqtt do
     end
   end
 
-  defp ensure_keepalive_timer(property("Server-Keep-Alive", secs) = state) do
+  defp ensure_keepalive_timer(state(properties: %{"Server-Keep-Alive": secs}) = state) do
     ensure_keepalive_timer(:timer.seconds(secs), state(state, keepalive: secs))
   end
-  defp ensure_keepalive_timer(state{keepalive: 0} = state) do
+  defp ensure_keepalive_timer(state(keepalive: 0) = state) do
     state
   end
-  defp ensure_keepalive_timer(state(keepalive: i} = state) ->
+  defp ensure_keepalive_timer(state(keepalive: i) = state) do
     ensure_keepalive_timer(:timer.seconds(i), state)
-  defp ensure_keepalive_timer(i, state) when is_integer(i) ->
+  end
+  defp ensure_keepalive_timer(i, state) when is_integer(i) do
     state(state, keepalive_timer: :erlang.start_timer(i, self(), :keepalive))
+  end
 
   defp new_call(id, from) do
     new_call(id, from, nil)
@@ -1143,7 +1334,7 @@ defmodule Exmqtt do
     state(data, pending_calls: [call | calls])
   end
 
-  defp take_call(id, state{pending_calls: calls) = data) do
+  defp take_call(id, state(pending_calls: calls) = data) do
     # REVIEW: id equals 1 in elixir, and equals 2 in erlang
     case List.keytake(calls, id, call(:id)) do
       {call, left} ->
@@ -1158,7 +1349,7 @@ defmodule Exmqtt do
   end
   defp timeout_calls(now, timeout, calls) do
     List.foldl(calls, [], fn (call(from: from, ts: ts) = c, acc) ->
-      case (div(:timer.now_diff(now, ts), 1000) >= timeout do
+      case div(:timer.now_diff(now, ts), 1000) >= timeout do
           true  ->
             send(from, {:error, :ack_timeout})
             acc
@@ -1174,7 +1365,7 @@ defmodule Exmqtt do
   end
   defp ensure_ack_timer(state), do: state
 
-  defp ensure_retry_timer(state(retry_interval: Interval) = state) do
+  defp ensure_retry_timer(state(retry_interval: interval) = state) do
     do_ensure_retry_timer(interval, state)
   end
 
@@ -1209,11 +1400,11 @@ defmodule Exmqtt do
 
   defp retry_send(:publish, %Packet.Msg{qos: qos, packet_id: packet_id} = msg,
                  now, state(inflight: inflight) = state) do
-    msg1 = %Packet.Msg{dup: (qos === Const.qos_1)}
+    msg1 = %Packet.Msg{msg | dup: (qos === Const.qos_1)}
     case send_data(msg1, state) do
         {:ok, new_state} ->
             inflight1 = Map.put(inflight, packet_id, {:publish, msg1, now})
-            {:ok, state(new_state, inflight: inflight1}}
+            {:ok, state(new_state, inflight: inflight1)}
         {:error, _reason} = error ->
             error
     end
@@ -1231,9 +1422,9 @@ defmodule Exmqtt do
 
   defp deliver(%Packet.Msg{qos: qos, dup: dup, retain: retain, packet_id: packet_id,
               topic: topic, props: props, payload: payload}, state) do
-    msg = %{qos: qos, dup: dup, retain: retain, packet_id: packetId, topic: topic,
+    msg = %{qos: qos, dup: dup, retain: retain, packet_id: packet_id, topic: topic,
             properties: props, payload: payload, client_pid: self()}
-    :ok = eval_msg_handler(state, publish, msg)
+    :ok = eval_msg_handler(state, :publish, msg)
     state
   end
 
@@ -1260,7 +1451,7 @@ defmodule Exmqtt do
 
   defp packet_to_msg(%Packet.Mqtt{header: %Packet.Header{type: Const.publish,
                                                         dup: dup,
-                                                        qos: sos,
+                                                        qos: qos,
                                                         retain: r},
                                 variable: %Packet.Publish{topic_name: topic,
                                                            packet_id: packet_id,
@@ -1320,16 +1511,16 @@ defmodule Exmqtt do
     send_data(msg_to_packet(msg), state)
   end
 
-  def send_data(%Packet.Mqtt{} = packet, state(conn_mod: conn_mod, socket: sock, proto_ver: ver} = state) do
+  def send_data(%Packet.Mqtt{} = packet, state(conn_mod: conn_mod, socket: sock, proto_ver: ver) = state) do
     data = Frame.serialize(packet, ver)
-    log(:debug, "SEND Data", [packet], state)
+    Logger.debug("SEND Data #{inspect(packet)}")
     case conn_mod.send_data(sock, data) do
         :ok -> {:ok, bump_last_packet_id(state)}
         error -> error
     end
   end
 
-  def run_sock(state(conn_mod: conn_mod, socket: sock} = state) do
+  def run_sock(state(conn_mod: conn_mod, socket: sock) = state) do
     conn_mod.setopts(sock, [{:active, :once}])
     state
   end
@@ -1342,11 +1533,14 @@ defmodule Exmqtt do
   end
 
   def process_incoming(bytes, packets, state(parse_state: parse_state) = state) do
-    try Frame.parse(bytes, parse_state) do
+    # try Frame.parse(bytes, parse_state) do
+    try do
+      case Frame.parse(bytes, parse_state) do
         {:ok, packet, rest, n_parse_state} ->
           process_incoming(rest, [packet | packets], state(state, parse_state: n_parse_state))
         {:more, n_parse_state} ->
           {:keep_state, state(state, parse_state: n_parse_state), next_events(packets)}
+      end
     rescue
         error -> {:stop, error}
     end
@@ -1440,18 +1634,6 @@ defmodule Exmqtt do
   # -----------------------------------------------------------------
   # Helper
   # -----------------------------------------------------------------
-  defp property(name, val), do: state(properties: %{name => val})
-
-  defp will_msg(qos, retain, topic, props, payload) do
-    %Packet.Msg{
-      qos: qos,
-		  retain: retain,
-		  topic: topic,
-		  props: props,
-		  payload: payload
-    }
-  end
-
   defp with_owner(options) do
     case Keyword.get(options, :owner) do
       owner when is_pid(owner) ->
@@ -1494,9 +1676,6 @@ defmodule Exmqtt do
       :exactly_once  -> Const.qos_2
     end
   end
-
-  @compile {:inline, is_qos: 1}
-  defp is_qos(i), do: (i >= Const.qos_0) and (i <= Const.qos_2)
 
   defp record_info(record) do
     state(record) |> Keyword.keys()

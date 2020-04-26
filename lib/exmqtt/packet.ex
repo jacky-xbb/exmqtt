@@ -17,10 +17,10 @@ defmodule Exmqtt.Packet do
   # MQTT Message
   # ----------------------------
   defmodule Msg do
-    defstruct :packet_id,
-              :topic,
-              :props,
-              :payload,
+    defstruct packet_id: nil,
+              topic: nil,
+              props: nil,
+              payload: nil,
               qos: Const.qos_0,
               retain: false,
               dup: false
