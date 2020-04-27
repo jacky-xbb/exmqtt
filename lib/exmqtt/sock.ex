@@ -21,7 +21,7 @@ defmodule Exmqtt.Sock do
         case List.keyfind(sock_opts, :ssl_opts, 0) do
           {:ssl_opts, ssl_opts} ->
             ssl_upgrade(sock, ssl_opts, timeout)
-          false ->
+          nil ->
             {:ok, sock}
         end
       {:error, reason} ->

@@ -46,7 +46,7 @@ defmodule Exmqtt do
                     | {:qos, qos() | qos_name()}
 
   @type subscribe_ret() :: {:ok, properties(), [reason_code()]} | {:error, term()}
-  @type conn_mod() :: :emqtt_sock | :emqtt_ws
+  @type conn_mod() :: Sock | Ws
   @type client() :: pid() | atom()
   @opaque mqtt_msg() :: %Packet.Msg{}
 
@@ -162,11 +162,11 @@ defmodule Exmqtt do
 
   @spec connect(client()) :: {:ok, properties()} | {:error, term()}
   def connect(client) do
-    do_call(client, {:connect, :emqtt_sock})
+    do_call(client, {:connect, Sock})
   end
 
   def ws_connect(client) do
-    do_call(client, {:connect, :emqtt_ws})
+    do_call(client, {:connect, Ws})
   end
 
   # @private
@@ -422,7 +422,7 @@ defmodule Exmqtt do
       host:             {127,0,0,1},
       port:             1883,
       hosts:            [],
-      conn_mod:         :emqtt_sock,
+      conn_mod:         Sock,
       sock_opts:        [],
       bridge_mode:      false,
       clientid:         client_id,
@@ -447,7 +447,6 @@ defmodule Exmqtt do
       last_packet_id:   1
     ))
     {:ok, :initialized, init_parse_state(state)}
-
   end
 
   def init([], state) do
@@ -609,14 +608,14 @@ defmodule Exmqtt do
     connect_timeout: timeout) = state) do
     case sock_connect(conn_mod, hosts(state), sock_opts, timeout) do
         {:ok, sock} ->
-          case mqtt_connect(run_sock(state(conn_mod: conn_mod, socket: sock))) do
+          case mqtt_connect(run_sock(state(state, conn_mod: conn_mod, socket: sock))) do
             {:ok, new_state} ->
               {:next_state, :waiting_for_connack, add_call(new_call(:connect, from), new_state), [timeout]}
             {:error, reason} = error ->
-                {:stop_and_reply, reason, [{:reply, from, error}]}
+              {:stop_and_reply, reason, [{:reply, from, error}]}
           end
         {:error, reason} = error ->
-            {:stop_and_reply, {:shutdown, reason}, [{:reply, from, error}]}
+          {:stop_and_reply, {:shutdown, reason}, [{:reply, from, error}]}
     end
   end
 
@@ -682,6 +681,7 @@ defmodule Exmqtt do
                        clientid: assign_id(client_id, all_props1),
                        properties: all_props1,
                        session_present: sess_present)
+
         {:next_state, :connected, ensure_keepalive_timer(state2), [{:reply, from, reply}]}
       false ->
         {:stop, :bad_connack}
@@ -1080,8 +1080,8 @@ defmodule Exmqtt do
     end
   end
 
-  def connected(event_type, event_content, Data) do
-    handle_event(event_type, event_content, :connected, Data)
+  def connected(event_type, event_content, data) do
+    handle_event(event_type, event_content, :connected, data)
   end
 
   def inflight_full({:call, _from}, {:publish, %Packet.Msg{qos: qos}}, _state)
@@ -1649,7 +1649,7 @@ defmodule Exmqtt do
     i2 = :rand.uniform(round(:math.pow(2, 32))) - 1
     {:ok, host} = :inet.gethostname()
     rand_id = :io_lib.format("~12.16.0b~8.16.0b", [i1, i2])
-    :erlang.iolist_to_binary(["emqtt-", host, "-", rand_id])
+    :erlang.iolist_to_binary(["exmqtt-", host, "-", rand_id])
   end
 
   defp merge_opts(defaults, options) do
@@ -1689,5 +1689,4 @@ defmodule Exmqtt do
         :error
     end
   end
-
 end

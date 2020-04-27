@@ -23,6 +23,7 @@ defmodule Exmqtt.MixProject do
   defp deps do
     [
       {:gen_state_machine, "~> 2.1"},
+      {:gun, "~> 1.3"},
     ]
   end
 end
