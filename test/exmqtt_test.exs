@@ -4,6 +4,8 @@ defmodule ExmqttTest do
 
   alias Exmqtt
 
+  @moduletag capture_log: true
+
   @topics [<<"TopicA">>, <<"TopicA/B">>, <<"topic/c">>,
           <<"TopicA/c">>, <<"/TopicA">>]
 
@@ -35,7 +37,7 @@ defmodule ExmqttTest do
     {:ok, c2} = Exmqtt.start_link()
     {:ok, _} = Exmqtt.connect(c2)
 
-    {ok, _, [2]} = Exmqtt.subscribe(c2, topic, 2)
+    {:ok, _, [2]} = Exmqtt.subscribe(c2, topic, 2)
     :timer.sleep(10)
     :ok = Exmqtt.stop(c1)
     :timer.sleep(5)

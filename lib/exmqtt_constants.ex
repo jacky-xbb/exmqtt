@@ -103,7 +103,7 @@ defmodule ExmqttConstants do
   # ------------------------------------------------------
   define(mqtt_proto_v3, 3)
   define(mqtt_proto_v4, 4)
-  define(mqtt_proto_v5, 6)
+  define(mqtt_proto_v5, 5)
 
   # ------------------------------------------------------
   # MQTT Frame Mask

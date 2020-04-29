@@ -1,21 +1,9 @@
-defmodule QoS do
-  require ExmqttConstants
-  alias ExmqttConstants, as: Const
-  @spec is_qos(any) :: boolean
-  defmacro is_qos(i) do
-    quote do
-      unquote(i >= Const.qos_0 and i <= Const.qos_2)
-    end
-  end
-end
-
 defmodule Exmqtt do
   use GenStateMachine, callback_mode: :state_functions
 
   require Record
   require Logger
   require ExmqttConstants
-  require QoS
 
   alias ExmqttConstants, as: Const
   alias Exmqtt.Packet
@@ -1687,6 +1675,17 @@ defmodule Exmqtt do
         {value, Map.delete(map, key)}
       :error ->
         :error
+    end
+  end
+end
+
+defmodule QoS do
+  require ExmqttConstants
+  alias ExmqttConstants, as: Const
+  @spec is_qos(any) :: boolean
+  defmacro is_qos(i) do
+    quote do
+      unquote(i >= Const.qos_0 and i <= Const.qos_2)
     end
   end
 end

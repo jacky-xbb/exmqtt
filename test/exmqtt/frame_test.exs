@@ -1,9 +1,11 @@
-defmodule Exmatt.FrameTest do
+defmodule Exmqtt.FrameTest do
   use ExUnit.Case
   require ExmqttConstants
   alias ExmqttConstants, as: Const
   alias Exmqtt.Frame
   alias Exmqtt.Packet
+
+  @moduletag capture_log: true
 
   describe "connect packet" do
     test "serialize and parse the connection packet" do

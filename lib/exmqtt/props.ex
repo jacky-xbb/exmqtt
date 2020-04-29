@@ -73,11 +73,12 @@ defmodule Exmqtt.Props do
           {:ok, {_name, _type, "All"}} ->
             true
           {:ok, {_name, _type, allowed_types}} ->
-            Enum.member?(packet_type, allowed_types)
+            Enum.member?(allowed_types, packet_type)
           :error ->
             false
         end
       end)
+      |> Map.new
   end
 
   def validate(props) when is_map(props) do
