@@ -27,7 +27,6 @@ defmodule Exmqtt.MixProject do
   defp deps do
     [
       {:gen_state_machine, "~> 2.1", only: [:dev, :prod]},
-      {:gun, "~> 1.3", override: true, only: [:dev, :prod]},
       {:emqx, github: "emqx/emqx", branch: "master", only: [:test]},
       {:emqx_ct_helpers, github: "emqx/emqx-ct-helpers", tag: "1.2.1", only: [:test]},
     ]
