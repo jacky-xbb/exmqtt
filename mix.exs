@@ -28,6 +28,7 @@ defmodule Exmqtt.MixProject do
     [
       {:gen_state_machine, "~> 2.1", only: [:dev, :prod]},
       {:gun, "~> 1.3", override: true, only: [:dev, :prod]},
+      {:meck, github: "eproxus/meck", tag: "0.8.13", only: [:test]},
       {:emqx, github: "emqx/emqx", branch: "master", only: [:test]},
       {:emqx_ct_helpers, github: "emqx/emqx-ct-helpers", tag: "1.2.1", only: [:test]},
     ]
