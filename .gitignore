@@ -22,5 +22,7 @@ erl_crash.dump
 # Ignore package tarball (built via "mix hex.build").
 exmqtt-*.tar
 
+mix.lock
+
 /.elixir_ls/
 

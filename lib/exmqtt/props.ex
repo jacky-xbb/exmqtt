@@ -1,7 +1,7 @@
 defmodule Exmqtt.Props do
   require ExmqttConstants
   alias ExmqttConstants, as: Const
-  alias Exmqtt.Errors.BadProperty
+  alias Exmqtt.Errors
 
   @props_table %{
     0x01 => {"Payload-Format-Indicator", "Byte", [Const.publish]},
@@ -88,9 +88,9 @@ defmodule Exmqtt.Props do
   def validate_prop({name, val} = prop) do
     case Map.fetch(@props_table, id(name)) do
       {:ok, {_name, type, _}}  ->
-        validate_value(type, val) or raise BadProperty, prop
+        validate_value(type, val) or raise Errors.BadProperty, prop
       :error ->
-        raise BadProperty, prop
+        raise Errors.BadProperty, prop
     end
   end
 

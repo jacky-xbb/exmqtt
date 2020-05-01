@@ -1,5 +1,5 @@
 defmodule ExmqttTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: false
   require Logger
 
   alias Exmqtt
@@ -90,26 +90,6 @@ defmodule ExmqttTest do
     Exmqtt.disconnect(c)
   end
 
-  # test "redelivery on reconnect" do
-  #   {:ok, c1} = Exmqtt.start_link([{:clean_start, false}, {:clientid, <<"c">>}])
-  #   {:ok, _} = Exmqtt.connect(c1)
-
-  #   {ok, _, [2]} = Exmqtt.subscribe(c1, Enum.at(@wild_topics, 6), 2)
-  #   :timer.sleep(10)
-  #   :ok = Exmqtt.pause(c1)
-  #   {ok, _} = Exmqtt.publish(c1, Enum.at(@topics, 1), <<>>, [{:qos, 1}, {:retain, false}])
-  #   {ok, _} = Exmqtt.publish(c1, Enum.at(@topics, 3), <<>>, [{:qos, 2}, {:retain, false}])
-  #   :timer.sleep(10)
-  #   :ok = Exmqtt.disconnect(c1)
-  #   assert 0 == length(receive_messages(2))
-  #   {:ok, c2} = Exmqtt.start_link([{:clean_start, false}, {:clientid, <<"c">>}])
-  #   {:ok, _} = Exmqtt.connect(c2)
-
-  #   :timer.sleep(10)
-  #   :ok = Exmqtt.disconnect(c2)
-  #   assert 2 == length(receive_messages(2))
-  # end
-
   test "dollar topics" do
     {:ok, c} = Exmqtt.start_link([{:clean_start, true}, {:keepalive, 0}])
     {:ok, _} = Exmqtt.connect(c)
@@ -122,6 +102,25 @@ defmodule ExmqttTest do
     :ok = Exmqtt.disconnect(c)
   end
 
+  # test "redelivery on reconnect" do
+  #   {:ok, c1} = Exmqtt.start_link([{:clean_start, false}, {:clientid, <<"c">>}])
+  #   {:ok, _} = Exmqtt.connect(c1)
+
+  #   {:ok, _, [2]} = Exmqtt.subscribe(c1, Enum.at(@wild_topics, 6), 2)
+  #   :timer.sleep(10)
+  #   :ok = Exmqtt.pause(c1)
+  #   {:ok, _} = Exmqtt.publish(c1, Enum.at(@topics, 1), <<>>, [{:qos, 1}, {:retain, false}])
+  #   {:ok, _} = Exmqtt.publish(c1, Enum.at(@topics, 3), <<>>, [{:qos, 2}, {:retain, false}])
+  #   :timer.sleep(10)
+  #   :ok = Exmqtt.disconnect(c1)
+  #   assert 0 == length(receive_messages(2))
+  #   {:ok, c2} = Exmqtt.start_link([{:clean_start, false}, {:clientid, <<"c">>}])
+  #   {:ok, _} = Exmqtt.connect(c2)
+
+  #   :timer.sleep(10)
+  #   :ok = Exmqtt.disconnect(c2)
+  #   assert 2 == length(receive_messages(2))
+  # end
 
   # -----------------------------------------------------------------
   # Helper

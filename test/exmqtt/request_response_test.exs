@@ -8,13 +8,6 @@ defmodule Exmqtt.RequestResponseTest do
 
   @moduletag capture_log: true
 
-  setup do
-    :emqx_ct_helpers.start_apps([])
-
-    on_exit(fn ->
-      :emqx_ct_helpers.stop_apps([])
-    end)
-  end
 
   test "request response" do
     request_response_per_qos(Const.qos_0)

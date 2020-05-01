@@ -2,6 +2,7 @@ defmodule Exmqtt.Frame do
   require ExmqttConstants
   alias ExmqttConstants, as: Const
   alias Exmqtt.Packet
+  alias Exmqtt.Errors
 
 
   @type options() :: %{
@@ -79,7 +80,7 @@ defmodule Exmqtt.Frame do
     _multiplier,
     length,
     %{max_size: max_size}) when length > max_size do
-      raise "mqtt frame too large"
+      raise Errors.FrameTooLarge
   end
 
   def parse_remaining_len(<<>>, header, multiplier, length, options) do
@@ -111,7 +112,7 @@ defmodule Exmqtt.Frame do
     %{max_size: max_size} = options) do
     frame_len = value + len * multiplier
     if frame_len > max_size do
-      raise "mqtt frame too large"
+      raise Errors.FrameTooLarge
     else
       parse_frame(rest, header, frame_len, options)
     end
@@ -302,7 +303,7 @@ defmodule Exmqtt.Frame do
 
   def parse_packet_id(<<packet_id::16, rest::binary>>), do: {packet_id, rest}
 
-  def validate_packet_id(0), do: raise "bad packet id"
+  def validate_packet_id(0), do: raise Errors.BadPacketID
   def validate_packet_id(_), do: :ok
 
   def parse_properties(bin, ver) when ver !== Const.mqtt_proto_v5 do
@@ -491,7 +492,7 @@ defmodule Exmqtt.Frame do
         variable,
         payload) when Const.connect() <= type and type <= Const.auth() do
     len = :erlang.iolist_size(variable) + :erlang.iolist_size(payload)
-    len <= Const.max_packet_size() or raise "mqtt frame too large"
+    len <= Const.max_packet_size() or raise Errors.FrameTooLarge
     [
       <<type::4, flag(dup)::1, flag(qos)::2, flag(retain)::1>>,
       serialize_remaining_len(len),
@@ -874,7 +875,7 @@ defmodule Exmqtt.Frame do
     end
   end
 
-  def serialize_utf8_string(nil, false), do: raise("utf8 string undefined.")
+  def serialize_utf8_string(nil, false), do: Errors.UTF8Undifined
   def serialize_utf8_string(nil, true), do: <<>>
   def serialize_utf8_string(string, _allow_null), do: serialize_utf8_string(string)
 
@@ -933,13 +934,13 @@ defmodule Exmqtt.Frame do
   def validate_header(Const.pingresp(), 0, 0, 0), do: :ok
   def validate_header(Const.disconnect(), 0, 0, 0), do: :ok
   def validate_header(Const.auth(), 0, 0, 0), do: :ok
-  def validate_header(_type, _dup, _qos, _rt), do: raise "bad frame header"
+  def validate_header(_type, _dup, _qos, _rt), do: raise Errors.BadFrameHeader
 
   defp none(opts), do: {:none, opts}
   defp merge_opts(options), do: Map.merge(@default_options, options)
 
   def validate_subqos(qos) when Const.qos_0 <= qos and qos <= Const.qos_2, do: qos
-  def validate_subqos(_), do: raise "bad subqos"
+  def validate_subqos(_), do: raise Errors.BadSubQoS
 
   defp bool(0), do: false
   defp bool(1), do: true
